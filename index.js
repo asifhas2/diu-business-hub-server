@@ -3,7 +3,7 @@ const app = express()
 const cors = require('cors')
 require('dotenv').config();
 const port = process.env.PORT || 3000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 
@@ -21,6 +21,7 @@ app.use(cors());
 
 const verifyToken =async(req,res,next)=>{
     const token = req.headers.authorization;
+    // console.log(token);
 
     if(!token){
         return res.status(401).send({
@@ -60,6 +61,7 @@ async function run() {
     const db=client.db('diu_business-hub');
 
     const userCollection = db.collection('users');
+    const businessCollection =db.collection('business');
 
     //users related api 
 
@@ -84,6 +86,60 @@ async function run() {
         res.send(result);
     })
 
+    // Business related api 
+
+    app.get('/business',verifyToken,async(req,res)=>{
+
+        const status = req.query.status;
+        let query = {};
+
+        if(status){
+            query.status = status;
+        }
+        
+        const result = await businessCollection.find(query).toArray();
+
+        res.send(result);
+    })
+
+   app.post('/business', verifyToken, async(req,res)=>{
+
+    try {
+
+        const businessData = req.body;
+
+        const user = await userCollection.findOne({
+            email: req.decoded_email
+        });
+
+        if(!user){
+            return res.status(404).send({
+                message:"User not found"
+            });
+        }
+
+        const business = {
+            ...businessData,
+            userId: user._id,
+            status:"pending",
+            createdAt:new Date()
+        };
+
+
+        const result = await businessCollection.insertOne(business);
+
+        res.send(result);
+
+    } catch(error){
+
+        console.log(error);
+
+        res.status(500).send({
+            message:"Internal server error"
+        });
+    }
+
+});
 
 
 
